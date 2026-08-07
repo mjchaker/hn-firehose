@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HN Firehose — a live Hacker News reader</title>
+  <meta name="description" content="A live firehose reader for Hacker News, inspired by hnrss. Streams of newest posts, new comments and the front page, with hnrss-style filters." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%23ff6600'/><text x='50' y='68' font-size='58' text-anchor='middle' font-family='Verdana' fill='white'>Y</text></svg>" />
+  <link rel="preconnect" href="https://hn.algolia.com" crossorigin />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#" id="brand">
+        <span class="brand-mark">Y</span>
+        <span class="brand-name">HN <em>Firehose</em></span>
+      </a>
+
+      <nav class="feeds" id="feed-nav" aria-label="Firehose feeds">
+        <button class="feed-tab active" data-feed="frontpage">Front Page</button>
+        <button class="feed-tab" data-feed="newest">Newest</button>
+        <button class="feed-tab" data-feed="newcomments">New Comments</button>
+        <button class="feed-tab" data-feed="ask">Ask HN</button>
+        <button class="feed-tab" data-feed="show">Show HN</button>
+        <button class="feed-tab" data-feed="jobs">Jobs</button>
+        <button class="feed-tab" data-feed="polls">Polls</button>
+      </nav>
+
+      <div class="topbar-actions">
+        <button id="live-toggle" class="live-btn live" title="Pause/resume auto-refresh" aria-pressed="true">
+          <span class="live-dot" aria-hidden="true"></span><span id="live-label">LIVE</span>
+        </button>
+        <button id="theme-toggle" class="icon-btn" title="Toggle light/dark theme" aria-label="Toggle theme">◐</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar" aria-label="Feed filters">
+      <section class="panel">
+        <h2 class="panel-title">Filter the firehose</h2>
+
+        <label class="field">
+          <span class="field-label">Search <code>q=</code></span>
+          <input type="search" id="filter-q" placeholder="e.g. rust OR zig" autocomplete="off" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Min points <code>points=</code></span>
+          <input type="number" id="filter-points" min="0" step="10" placeholder="0" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Min comments <code>comments=</code></span>
+          <input type="number" id="filter-comments" min="0" step="5" placeholder="0" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Items <code>count=</code></span>
+          <select id="filter-count">
+            <option value="20">20</option>
+            <option value="30" selected>30</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </label>
+
+        <button id="apply-filters" class="primary-btn">Apply filters</button>
+        <button id="clear-filters" class="ghost-btn">Clear</button>
+      </section>
+
+      <section class="panel rss-panel">
+        <h2 class="panel-title">Take it as RSS</h2>
+        <p class="panel-hint">This exact feed, served by <a href="https://hnrss.github.io/" target="_blank" rel="noopener">hnrss</a>:</p>
+        <code class="rss-url" id="rss-url">https://hnrss.org/frontpage</code>
+        <div class="rss-actions">
+          <button id="copy-rss" class="ghost-btn">Copy URL</button>
+          <a id="open-jsonfeed" class="ghost-btn" href="https://hnrss.org/frontpage.jsonfeed" target="_blank" rel="noopener">JSON&nbsp;Feed</a>
+        </div>
+      </section>
+
+      <section class="panel stats-panel">
+        <h2 class="panel-title">Stream</h2>
+        <dl class="stats">
+          <div><dt>Items</dt><dd id="stat-items">0</dd></div>
+          <div><dt>Refresh</dt><dd id="stat-refresh">60s</dd></div>
+          <div><dt>Updated</dt><dd id="stat-updated">–</dd></div>
+        </dl>
+      </section>
+    </aside>
+
+    <section class="stream-wrap">
+      <div class="stream-head">
+        <h1 id="stream-title">Front Page</h1>
+        <p id="stream-desc" class="stream-desc">Posts currently on the Hacker News front page.</p>
+      </div>
+      <div id="new-items-bar" class="new-items-bar" hidden>
+        <button id="new-items-btn">Show <span id="new-items-count">0</span> new items ↑</button>
+      </div>
+      <ol id="stream" class="stream" aria-live="polite"></ol>
+      <div id="stream-status" class="stream-status">Loading…</div>
+      <div id="scroll-sentinel" class="scroll-sentinel" hidden>
+        <span class="spinner" aria-hidden="true"></span> Loading more…
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Data from the <a href="https://hn.algolia.com/api" target="_blank" rel="noopener">Algolia HN API</a> · feed design inspired by <a href="https://hnrss.github.io/" target="_blank" rel="noopener">hnrss</a> · not affiliated with Y&nbsp;Combinator</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

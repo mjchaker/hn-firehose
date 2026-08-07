@@ -1,0 +1,4 @@
+# Build output (app bundle + DMG) — rebuild with macos/build.sh / macos/make-dmg.sh
+dist/
+
+.DS_Store
