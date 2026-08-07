@@ -3,6 +3,8 @@
 A live, zero-build Hacker News reader inspired by the firehose feeds of
 [hnrss](https://hnrss.github.io/).
 
+![HN Firehose showing the live front page feed](docs/screenshot.png)
+
 ## Feeds
 
 Mirrors the hnrss feed catalog as live in-page streams:
