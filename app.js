@@ -171,11 +171,13 @@ function renderItem(hit, fresh = false) {
             ${esc(hit.author)} <span class="item-domain">commented</span>
           </a>
         </h3>
-        <div class="comment-body">${sanitizeCommentHtml(hit.comment_text)}</div>
+        <div class="comment-body clamped" title="Click to expand">${sanitizeCommentHtml(hit.comment_text)}</div>
         <div class="comment-context">
           on <a href="${esc(hnLink)}" target="_blank" rel="noopener">${esc(hit.story_title || "a thread")}</a>
           · ${timeAgo(hit.created_at_i)}
+          · <button class="thread-toggle" data-id="${esc(hit.objectID)}" data-kind="comment" aria-expanded="false">replies</button>
         </div>
+        <div class="thread" hidden></div>
       </div>`;
     return li;
   }
@@ -199,11 +201,160 @@ function renderItem(hit, fresh = false) {
         ${tag ? `<span class="badge">${tag}</span>` : ""}
         <span>by <a class="author" href="https://news.ycombinator.com/user?id=${esc(hit.author)}" target="_blank" rel="noopener">${esc(hit.author)}</a></span>
         <span>${timeAgo(hit.created_at_i)}</span>
-        <a href="${esc(hnLink)}" target="_blank" rel="noopener">${hit.num_comments ?? 0} comments</a>
+        <button class="thread-toggle" data-id="${esc(hit.story_id || hit.objectID)}" data-kind="story" aria-expanded="false">${hit.num_comments ?? 0} comments</button>
+        <a class="hn-link" href="${esc(hnLink)}" target="_blank" rel="noopener" title="Open on Hacker News">HN ↗</a>
       </div>
+      <div class="thread" hidden></div>
     </div>`;
   return li;
 }
+
+/* ---------------- Comment threads ----------------
+   Clicking "N comments" on a story (or "replies" on a comment) loads the
+   full item from Algolia's /items endpoint and renders the nested thread
+   inline, HN-style: collapsible sub-threads, permalinks, deleted-comment
+   placeholders. Threads are cached per item for the life of the page. */
+
+const THREAD_CACHE_MS = 60_000;
+const threadCache = new Map(); // id -> { item, at }
+
+async function fetchItem(id, { force = false } = {}) {
+  const cached = threadCache.get(id);
+  if (cached && !force && Date.now() - cached.at < THREAD_CACHE_MS) return cached.item;
+  const res = await fetch(`${API}/items/${encodeURIComponent(id)}`);
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  const item = await res.json();
+  threadCache.set(id, { item, at: Date.now() });
+  return item;
+}
+
+function isDeleted(node) {
+  return !node.author && !node.text;
+}
+
+/* Number of live (non-deleted) comments in a subtree, excluding the root. */
+function countReplies(node) {
+  let n = 0;
+  for (const c of node.children ?? []) n += (isDeleted(c) ? 0 : 1) + countReplies(c);
+  return n;
+}
+
+function renderComment(node, depth) {
+  const replies = countReplies(node);
+  const deleted = isDeleted(node);
+  if (deleted && replies === 0) return "";
+
+  const kids = (node.children ?? [])
+    .slice()
+    .sort((a, b) => (a.created_at_i ?? 0) - (b.created_at_i ?? 0))
+    .map((c) => renderComment(c, depth + 1))
+    .join("");
+
+  const permalink = `https://news.ycombinator.com/item?id=${node.id}`;
+  const head = deleted
+    ? `<span class="c-deleted">[deleted]</span>`
+    : `<a class="author" href="https://news.ycombinator.com/user?id=${esc(node.author)}" target="_blank" rel="noopener">${esc(node.author)}</a>
+       <a class="c-time" href="${esc(permalink)}" target="_blank" rel="noopener" title="Permalink on Hacker News">${timeAgo(node.created_at_i)}</a>`;
+
+  return `
+    <li class="c" id="c-${esc(String(node.id))}" data-replies="${replies}" style="--depth:${depth}">
+      <div class="c-head">
+        <button class="c-toggle" aria-expanded="true" title="Collapse thread"><span class="c-toggle-open">[–]</span><span class="c-toggle-closed">[+] ${replies + 1}</span></button>
+        ${head}
+      </div>
+      ${deleted ? "" : `<div class="c-body">${sanitizeCommentHtml(node.text)}</div>`}
+      ${kids ? `<ol class="c-children">${kids}</ol>` : ""}
+    </li>`;
+}
+
+function renderThread(container, item, kind) {
+  const total = countReplies(item);
+  const noun = kind === "comment" ? "repl" : "comment";
+  const label = total === 1 ? `1 ${noun}y` : `${total} ${noun}${noun === "repl" ? "ies" : "s"}`;
+  const hnLink = `https://news.ycombinator.com/item?id=${item.id}`;
+  const list = (item.children ?? [])
+    .slice()
+    .sort((a, b) => (b.points ?? 0) - (a.points ?? 0) || (a.created_at_i ?? 0) - (b.created_at_i ?? 0))
+    .map((c) => renderComment(c, 0))
+    .join("");
+
+  container.innerHTML = `
+    <div class="thread-head">
+      <span class="thread-count">${label}</span>
+      <button class="thread-refresh" type="button">refresh</button>
+      <a href="${esc(hnLink)}" target="_blank" rel="noopener">open on HN ↗</a>
+      <button class="thread-close" type="button">close</button>
+    </div>
+    ${kind === "story" && item.text ? `<div class="thread-story-text">${sanitizeCommentHtml(item.text)}</div>` : ""}
+    ${list ? `<ol class="comments">${list}</ol>` : `<p class="thread-empty">No ${noun === "repl" ? "replies" : "comments"} yet.</p>`}`;
+}
+
+async function loadThread(container, id, kind, { force = false } = {}) {
+  container.hidden = false;
+  container.dataset.id = id;
+  if (!container.dataset.loaded || force) {
+    container.innerHTML = `<div class="thread-status"><span class="spinner" aria-hidden="true"></span> Loading thread…</div>`;
+  }
+  try {
+    const item = await fetchItem(id, { force });
+    // Guard against a stale response after the thread was closed/reopened for another id.
+    if (container.dataset.id !== String(id)) return;
+    renderThread(container, item, kind);
+    container.dataset.loaded = "1";
+  } catch (err) {
+    container.innerHTML = `<div class="thread-status error">Could not load the thread (${esc(err.message)}). <button class="thread-refresh" type="button">Retry</button></div>`;
+  }
+}
+
+function setThreadOpen(li, open) {
+  const container = li.querySelector(":scope > .item-main > .thread");
+  const toggle = li.querySelector(":scope > .item-main .thread-toggle");
+  if (!container || !toggle) return;
+  toggle.setAttribute("aria-expanded", String(open));
+  li.classList.toggle("thread-open", open);
+  if (open) {
+    loadThread(container, toggle.dataset.id, toggle.dataset.kind);
+  } else {
+    container.hidden = true;
+  }
+}
+
+streamEl.addEventListener("click", (e) => {
+  const li = e.target.closest(".item");
+  if (!li) return;
+
+  const toggle = e.target.closest(".thread-toggle");
+  if (toggle) {
+    setThreadOpen(li, toggle.getAttribute("aria-expanded") !== "true");
+    return;
+  }
+
+  if (e.target.closest(".thread-close")) { setThreadOpen(li, false); return; }
+
+  const refresh = e.target.closest(".thread-refresh");
+  if (refresh) {
+    const container = refresh.closest(".thread");
+    const t = li.querySelector(":scope > .item-main .thread-toggle");
+    loadThread(container, t.dataset.id, t.dataset.kind, { force: true });
+    return;
+  }
+
+  const collapse = e.target.closest(".c-toggle");
+  if (collapse) {
+    const c = collapse.closest(".c");
+    const collapsed = c.classList.toggle("collapsed");
+    collapse.setAttribute("aria-expanded", String(!collapsed));
+    collapse.title = collapsed ? "Expand thread" : "Collapse thread";
+    return;
+  }
+
+  // Firehose comment previews are clamped to a few lines; click to read the whole thing.
+  const preview = e.target.closest(".comment-body.clamped, .comment-body.expanded");
+  if (preview && !e.target.closest("a")) {
+    preview.classList.toggle("clamped");
+    preview.classList.toggle("expanded");
+  }
+});
 
 /* ---------------- Data flow ---------------- */
 

@@ -23,6 +23,9 @@ Mirrors the hnrss feed catalog as live in-page streams:
   the page never jumps under you. Pausable via the LIVE toggle.
 - **hnrss-style filters** — `q=` keyword search, `points=` minimum score,
   `comments=` minimum comment count, `count=` page size.
+- **Inline comment threads** — click a story's comment count (or "replies" on
+  a comment in the firehose) to read the full nested thread right in the
+  stream: collapsible sub-threads, permalinks, refresh, no page hop to HN.
 - **Infinite scroll** — older pages load automatically as you approach the
   bottom of the stream.
 - **RSS hand-off** — the sidebar always shows the `hnrss.org` URL for the exact
@@ -59,6 +62,10 @@ layout):
 ```
 ./macos/make-dmg.sh
 ```
+
+No Mac handy? The **Mac app** GitHub Actions workflow builds the DMG on every
+pull request and push to `main` (download it from the run's artifacts), and
+attaches it to the release when a `v*` tag is pushed.
 
 The app is ad-hoc signed, not notarized — people you share it with will need
 to right-click → Open the first time (or run

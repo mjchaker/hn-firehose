@@ -6,11 +6,15 @@ cd "$(dirname "$0")"
 ROOT="$(cd .. && pwd)"
 DIST="$ROOT/dist"
 APP="$DIST/HN Firehose.app"
-VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Contents/Info.plist" 2>/dev/null || echo 1.0)"
-DMG="$DIST/HN-Firehose-$VERSION.dmg"
 
 # Always package a fresh build.
 ./build.sh
+
+# Read the version only after build.sh has written Info.plist: on a clean
+# checkout PlistBuddy would otherwise print "File Doesn't Exist, Will Create:
+# <path>" to stdout and that text would end up in the DMG filename.
+VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Contents/Info.plist")"
+DMG="$DIST/HN-Firehose-$VERSION.dmg"
 
 echo "==> Staging DMG contents"
 STAGE="$(mktemp -d)"
@@ -20,13 +24,16 @@ ln -s /Applications "$STAGE/Applications"
 
 echo "==> Creating DMG"
 rm -f "$DMG"
-hdiutil create \
-  -volname "HN Firehose" \
-  -srcfolder "$STAGE" \
-  -fs HFS+ \
-  -format UDZO \
-  -quiet \
-  "$DMG"
+# hdiutil occasionally reports "Resource busy" while the staging folder is
+# still being indexed (seen on CI runners); retry a few times before giving up.
+for attempt in 1 2 3; do
+  if hdiutil create -volname "HN Firehose" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DMG"; then
+    break
+  fi
+  [ "$attempt" -eq 3 ] && { echo "hdiutil create failed after $attempt attempts" >&2; exit 1; }
+  echo "hdiutil create failed (attempt $attempt), retrying…" >&2
+  sleep 3
+done
 
 echo "==> Done: $DMG"
 du -h "$DMG" | cut -f1

@@ -24,8 +24,8 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
   <key>CFBundleName</key>              <string>HN Firehose</string>
   <key>CFBundleDisplayName</key>       <string>HN Firehose</string>
   <key>CFBundleIdentifier</key>        <string>dev.mchaker.hnfirehose</string>
-  <key>CFBundleVersion</key>           <string>1.0</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>CFBundleVersion</key>           <string>1.1</string>
+  <key>CFBundleShortVersionString</key><string>1.1</string>
   <key>CFBundleExecutable</key>        <string>HN Firehose</string>
   <key>CFBundlePackageType</key>       <string>APPL</string>
   <key>CFBundleIconFile</key>          <string>AppIcon</string>
