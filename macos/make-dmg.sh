@@ -7,8 +7,11 @@ ROOT="$(cd .. && pwd)"
 DIST="$ROOT/dist"
 APP="$DIST/HN Firehose.app"
 
-# Always package a fresh build.
-./build.sh
+# Package a fresh build unless the caller already built (and possibly
+# notarized) the app and just wants it wrapped: SKIP_BUILD=1 ./make-dmg.sh
+if [ -z "${SKIP_BUILD:-}" ]; then
+  ./build.sh
+fi
 
 # Read the version only after build.sh has written Info.plist: on a clean
 # checkout PlistBuddy would otherwise print "File Doesn't Exist, Will Create:

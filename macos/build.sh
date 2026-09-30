@@ -51,7 +51,15 @@ rm -rf "$ICON_TMP"
 echo "==> Compiling"
 swiftc -O -framework Cocoa -framework WebKit main.swift -o "$CONTENTS/MacOS/HN Firehose"
 
-echo "==> Signing (ad-hoc)"
-codesign --force -s - "$APP"
+# Sign with a Developer ID certificate when CODESIGN_IDENTITY names one
+# (CI does this before notarizing); otherwise ad-hoc sign for local use.
+IDENTITY="${CODESIGN_IDENTITY:--}"
+if [ "$IDENTITY" = "-" ]; then
+  echo "==> Signing (ad-hoc)"
+  codesign --force -s - "$APP"
+else
+  echo "==> Signing ($IDENTITY, hardened runtime)"
+  codesign --force --timestamp --options runtime -s "$IDENTITY" "$APP"
+fi
 
 echo "==> Done: $APP"
