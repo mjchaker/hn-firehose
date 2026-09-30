@@ -20,25 +20,41 @@ ln -s /Applications "$STAGE/Applications"
 
 echo "==> Creating DMG"
 rm -f "$DMG"
-# hdiutil occasionally fails with "Resource busy" while the staging volume is
-# still being indexed (common on CI runners); retry a few times before giving up.
-for attempt in 1 2 3 4 5; do
-  if hdiutil create \
-      -volname "HN Firehose" \
-      -srcfolder "$STAGE" \
-      -fs HFS+ \
-      -format UDZO \
-      -ov \
-      "$DMG"; then
-    break
-  fi
-  if [ "$attempt" -eq 5 ]; then
-    echo "hdiutil create failed after $attempt attempts" >&2
-    exit 1
-  fi
-  echo "hdiutil create failed (attempt $attempt), retrying…" >&2
-  sleep 3
-done
+
+# Strategy 1: one-shot from the staging folder. Retried because hdiutil
+# occasionally reports "Resource busy" while the source is still being indexed.
+create_from_folder() {
+  local fs="$1" attempt
+  for attempt in 1 2 3; do
+    if hdiutil create -volname "HN Firehose" -srcfolder "$STAGE" -fs "$fs" -format UDZO -ov "$DMG"; then
+      return 0
+    fi
+    echo "hdiutil create (-fs $fs) failed, attempt $attempt" >&2
+    sleep 2
+  done
+  return 1
+}
+
+# Strategy 2: build a read-write image, mount it, copy the files in, then
+# compress. Slower but avoids -srcfolder, which some CI runners reject.
+create_by_mounting() {
+  local rw="$STAGE.rw.dmg" mnt dev
+  rm -f "$rw"
+  hdiutil create -size 64m -fs HFS+ -volname "HN Firehose" -ov "$rw"
+  mnt="$(mktemp -d)"
+  dev="$(hdiutil attach -nobrowse -readwrite -mountpoint "$mnt" "$rw" | awk '/^\/dev\// {print $1; exit}')"
+  cp -R "$APP" "$mnt/"
+  ln -s /Applications "$mnt/Applications"
+  sync
+  hdiutil detach "$dev"
+  hdiutil convert "$rw" -format UDZO -ov -o "$DMG"
+  rm -f "$rw"
+}
+
+create_from_folder HFS+ || create_from_folder APFS || {
+  echo "==> -srcfolder failed; building via a mounted image instead" >&2
+  create_by_mounting
+}
 
 echo "==> Done: $DMG"
 du -h "$DMG" | cut -f1

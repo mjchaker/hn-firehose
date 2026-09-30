@@ -21,6 +21,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Diagnose hdiutil (temporary)
+        continue-on-error: true
+        run: |
+          sw_vers; uname -m; hdiutil version || true
+          echo "TMPDIR=$TMPDIR"; ls -ld "$TMPDIR" /Applications
+          d="$(mktemp -d)"; echo hi > "$d/hello.txt"; ln -s /Applications "$d/Applications"; ls -la "$d"
+          hdiutil create -verbose -volname T -srcfolder "$d" -fs HFS+ -format UDZO -ov "$RUNNER_TEMP/t1.dmg" 2>&1 | tail -30 || true
+          rm -f "$d/Applications"
+          hdiutil create -verbose -volname T -srcfolder "$d" -fs HFS+ -format UDZO -ov "$RUNNER_TEMP/t2.dmg" 2>&1 | tail -30 || true
+          ls -la "$RUNNER_TEMP"/*.dmg || true
+
       - name: Build app and DMG
         run: ./macos/make-dmg.sh
 
