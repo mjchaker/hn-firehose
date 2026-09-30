@@ -110,8 +110,11 @@ jobs:
         if: env.RELEASE == 'true'
         run: |
           tag="${{ inputs.release_tag || github.ref_name }}"
+          # Name the release after the app's own version ("HN Firehose 1.1"),
+          # matching the DMG filename, rather than the tag ("v1.1.0").
+          version="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "dist/HN Firehose.app/Contents/Info.plist")"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "name=HN Firehose ${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "name=HN Firehose $version" >> "$GITHUB_OUTPUT"
           {
             echo "body<<EOF"
             echo "## Install"
