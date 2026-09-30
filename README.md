@@ -65,7 +65,8 @@ layout):
 
 No Mac handy? The **Mac app** GitHub Actions workflow builds the DMG on every
 pull request and push to `main` (download it from the run's artifacts), and
-attaches it to the release when a `v*` tag is pushed.
+attaches it to the release when a `v*` tag is pushed. Running the workflow by
+hand with a tag name (e.g. `v1.1.0`) creates that tag and release for you.
 
 The app is ad-hoc signed, not notarized — people you share it with will need
 to right-click → Open the first time (or run

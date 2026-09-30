@@ -1,7 +1,8 @@
 # Builds the native Mac app and packages it as a DMG on a macOS runner.
 # Every pull request and push to main uploads the DMG as a workflow artifact;
 # pushing a v* tag also attaches it to that tag's GitHub release. Run it by
-# hand (workflow_dispatch) for any other branch.
+# hand (workflow_dispatch) to build any branch, or give it a tag name to cut
+# a release (tag + GitHub release + DMG) without needing a Mac.
 name: Mac app
 
 on:
@@ -10,6 +11,11 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Create a GitHub release with this tag (e.g. v1.1.0) and attach the DMG. Leave empty to only build."
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -38,7 +44,11 @@ jobs:
           if-no-files-found: error
 
       - name: Attach DMG to release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: HN Firehose ${{ inputs.release_tag || github.ref_name }}
+          generate_release_notes: true
           files: dist/*.dmg
