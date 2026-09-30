@@ -63,6 +63,10 @@ layout):
 ./macos/make-dmg.sh
 ```
 
+No Mac handy? The **Mac app** GitHub Actions workflow builds the DMG on every
+push and pull request (download it from the run's artifacts), and attaches it
+to the release when a `v*` tag is pushed.
+
 The app is ad-hoc signed, not notarized — people you share it with will need
 to right-click → Open the first time (or run
 `xattr -d com.apple.quarantine "/Applications/HN Firehose.app"`). Story/comment links open in
