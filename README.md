@@ -68,9 +68,16 @@ pull request and push to `main` (download it from the run's artifacts), and
 attaches it to the release when a `v*` tag is pushed. Running the workflow by
 hand with a tag name (e.g. `v1.1.0`) creates that tag and release for you.
 
-The app is ad-hoc signed, not notarized — people you share it with will need
-to right-click → Open the first time (or run
-`xattr -d com.apple.quarantine "/Applications/HN Firehose.app"`). Story/comment links open in
-your default browser; ⌘R reloads; the window position is remembered. Note the
-web assets are copied into the bundle at build time, so re-run `build.sh`
-after editing them.
+Local builds are ad-hoc signed, not notarized, so on first launch macOS says
+it "could not verify HN Firehose is free of malware". Click **Done**, then go
+to **System Settings → Privacy & Security**, scroll to *Security* and click
+**Open Anyway** (or run
+`xattr -d com.apple.quarantine "/Applications/HN Firehose.app"`). On macOS 15
+and later right-click → Open no longer bypasses this. To ship builds that open
+without any warning, add the Apple developer secrets listed at the top of
+`.github/workflows/mac-app.yml`; the workflow then signs with Developer ID and
+notarizes both the app and the DMG.
+
+Story/comment links open in your default browser; ⌘R reloads; the window
+position is remembered. Note the web assets are copied into the bundle at
+build time, so re-run `build.sh` after editing them.
