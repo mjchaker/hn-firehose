@@ -20,13 +20,25 @@ ln -s /Applications "$STAGE/Applications"
 
 echo "==> Creating DMG"
 rm -f "$DMG"
-hdiutil create \
-  -volname "HN Firehose" \
-  -srcfolder "$STAGE" \
-  -fs HFS+ \
-  -format UDZO \
-  -quiet \
-  "$DMG"
+# hdiutil occasionally fails with "Resource busy" while the staging volume is
+# still being indexed (common on CI runners); retry a few times before giving up.
+for attempt in 1 2 3 4 5; do
+  if hdiutil create \
+      -volname "HN Firehose" \
+      -srcfolder "$STAGE" \
+      -fs HFS+ \
+      -format UDZO \
+      -ov \
+      "$DMG"; then
+    break
+  fi
+  if [ "$attempt" -eq 5 ]; then
+    echo "hdiutil create failed after $attempt attempts" >&2
+    exit 1
+  fi
+  echo "hdiutil create failed (attempt $attempt), retrying…" >&2
+  sleep 3
+done
 
 echo "==> Done: $DMG"
 du -h "$DMG" | cut -f1

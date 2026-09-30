@@ -1,11 +1,12 @@
 # Builds the native Mac app and packages it as a DMG on a macOS runner.
-# Every push and pull request uploads the DMG as a workflow artifact;
-# pushing a v* tag also attaches it to that tag's GitHub release.
+# Every pull request and push to main uploads the DMG as a workflow artifact;
+# pushing a v* tag also attaches it to that tag's GitHub release. Run it by
+# hand (workflow_dispatch) for any other branch.
 name: Mac app
 
 on:
   push:
-    branches: ["**"]
+    branches: [main]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
